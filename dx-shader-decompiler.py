@@ -276,7 +276,7 @@ class OpCodeToken():
         return s
 
     def __str__(self):
-        return "\n" + self.get_name()
+        return self.get_name()
 
 class SourceParamToken():
 # Source:
@@ -375,7 +375,7 @@ class VersionToken:
 
 class EndToken:
     def __init__(self, token): self.token = token
-    def __str__(self): return "\nend"
+    def __str__(self): return "end"
 
 class CommentToken:
     def __init__(self, token): 
@@ -452,10 +452,18 @@ class Shader():
             
 
     def __str__(self):
-        s = ''
-        for i in range(len( self.parsed_tokens )):
-            s += str( self.parsed_tokens[ i ] ) + " "
-        return s
+        s = []
+        line = []
+        for parsed_token in self.parsed_tokens:
+            if isinstance(parsed_token, (EndToken, OpCodeToken)) and line:
+                s.append(" ".join(line))
+                line.clear()
+
+            line.append(str(parsed_token))
+
+        if line:
+            s.append(" ".join(line))
+        return "\n".join(s)
 
 
 
@@ -479,12 +487,15 @@ def main():
     with open(sys.argv[1], "rb") as file:
         data = file.read()
 
-    if re.fullmatch(br"[0-9a-f\r\n]+", data):
+    if re.fullmatch(br"[0-9a-f\s]+", data):
         asm_code = [int(x, 16) for x in re.findall(b"[0-9a-f]{8}", data)]
     else:
+        if header_end_match := re.search(br"shader compiler.+?\x00\xab?", data, re.IGNORECASE):
+            data = data[header_end_match.end():]
+
         if len(data) % 4 != 0:
-            raise Exception("expected data to consist of 4-byte chunks")
-        asm_code = [int.from_bytes(data[i:i + 4]) for i in range(0, len(data), 4)]
+            raise Exception("expected data to consist of uint32s")
+        asm_code = [int.from_bytes(data[i:i + 4], byteorder="little") for i in range(0, len(data), 4)]
 
     sh = Shader(asm_code)
     sys.stdout.write(str(sh))
