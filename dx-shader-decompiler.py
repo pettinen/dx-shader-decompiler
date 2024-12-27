@@ -470,12 +470,27 @@ class Shader():
 #         if t3: asm_code.append( t3 )
 #         if t4: asm_code.append( t4 )
 
-for line in fileinput.input():
-    sys.stdout.write("Tokens: " + line)
-    asm_code = re.findall('[0-9a-f]{8}', line)
-    asm_code = map(lambda x: int(x, 16), asm_code)
-    sys.stdout.write("Assembly: \n")
+
+def main():
+    if len(sys.argv) != 2:
+        sys.stderr.write(f"Usage: {sys.argv[0]} <FILE>\n")
+        return
+
+    with open(sys.argv[1], "rb") as file:
+        data = file.read()
+
+    if re.fullmatch(br"[0-9a-f\r\n]+", data):
+        asm_code = [int(x, 16) for x in re.findall(b"[0-9a-f]{8}", data)]
+    else:
+        if len(data) % 4 != 0:
+            raise Exception("expected data to consist of 4-byte chunks")
+        asm_code = [int.from_bytes(data[i:i + 4]) for i in range(0, len(data), 4)]
+
     sh = Shader(asm_code)
-    sys.stdout.write( str( sh ) )
-    sys.stdout.write("\n\n")
+    sys.stdout.write(str(sh))
+    sys.stdout.write("\n")
     sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    main()
